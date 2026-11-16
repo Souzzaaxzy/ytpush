@@ -49,6 +49,7 @@ class YouTube:
         player_client: Optional[str] = None,
     ) -> None:
         self._ffmpeg_location = ffmpeg_location
+        self.cookiefile = cookiefile
         self.backend = backend or YtDlpBackend(
             ffmpeg_location=ffmpeg_location,
             cookiefile=cookiefile,
@@ -56,6 +57,13 @@ class YouTube:
             player_client=player_client,
         )
         self._ffmpeg = ffmpeg
+
+    def _cookie_header(self) -> Optional[str]:
+        if not self.cookiefile:
+            return None
+        from .ffmpeg import read_cookiefile
+
+        return read_cookiefile(self.cookiefile)
 
     # -- ffmpeg (lazy so importing the lib needs no ffmpeg) --------------
     @property
@@ -137,6 +145,7 @@ class YouTube:
                 duration=duration,
                 normalize=normalize,
                 http_headers=track.audio_headers,
+                cookie_header=self._cookie_header(),
             )
         except YtpushError:
             return self.download(

@@ -142,6 +142,48 @@ def test_convert_omits_headers_for_local_files(tmp_path, monkeypatch):
     assert "-headers" not in captured["args"]
 
 
+def test_read_cookiefile(tmp_path):
+    from ytpush.ffmpeg import read_cookiefile
+
+    path = tmp_path / "cookies.txt"
+    path.write_text(
+        "# Netscape HTTP Cookie File\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t9999999999\tSID\tabc123\n"
+        ".youtube.com\tTRUE\t/\tTRUE\t9999999999\tHSID\tdef456\n"
+        ".example.com\tTRUE\t/\tTRUE\t9999999999\tOTHER\tzzz\n"
+    )
+    header = read_cookiefile(str(path))
+    assert "SID=abc123" in header
+    assert "HSID=def456" in header
+    assert "OTHER" not in header
+
+
+def test_read_cookiefile_missing_file():
+    from ytpush.ffmpeg import read_cookiefile
+
+    assert read_cookiefile("/no/such/file.txt") is None
+
+
+def test_convert_sends_cookie_header(tmp_path, monkeypatch):
+    from ytpush.ffmpeg import FFmpeg
+
+    ff = FFmpeg.__new__(FFmpeg)
+    ff.ffmpeg = "/fake/ffmpeg"
+    ff.ffprobe = None
+    captured = {}
+    monkeypatch.setattr(ff, "run", lambda args, timeout=300.0: captured.setdefault("args", args) or "")
+    ff.convert(
+        "https://cdn.example/audio",
+        str(tmp_path / "o.mp3"),
+        fmt="mp3",
+        http_headers={"User-Agent": "UA"},
+        cookie_header="SID=abc",
+    )
+    blob = captured["args"][captured["args"].index("-headers") + 1]
+    assert "Cookie: SID=abc" in blob
+    assert "User-Agent: UA" in blob
+
+
 def test_duration_str_hours():
     t = Track.from_info({**VIDEO_INFO, "duration": 3725})
     assert t.duration_str == "1:02:05"

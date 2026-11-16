@@ -80,6 +80,7 @@ class Fetcher:
                     fmt=fmt,
                     bitrate=bitrate,
                     http_headers=track.audio_headers,
+                    cookie_header=self.yt._cookie_header(),
                 )
             except Exception:  # noqa: BLE001 - fall back to the downloader
                 audio_path = self.yt.download(

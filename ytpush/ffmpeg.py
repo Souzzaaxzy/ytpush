@@ -31,6 +31,27 @@ def _headers_blob(headers: dict) -> str:
     return "".join(f"{k}: {v}\r\n" for k, v in headers.items())
 
 
+def read_cookiefile(path: str) -> Optional[str]:
+    """Read a Netscape cookie file into a single ``Cookie:`` header value.
+
+    Returns ``None`` when the file has no usable cookies. yt-dlp uses the file
+    itself; this is for feeding the same session to ffmpeg.
+    """
+    pairs = []
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 7 and "youtube" in parts[0]:
+                    pairs.append(f"{parts[5]}={parts[6]}")
+    except OSError:
+        return None
+    return "; ".join(pairs) or None
+
+
 def _from_imageio() -> Optional[str]:
     try:
         import imageio_ffmpeg
@@ -109,6 +130,7 @@ class FFmpeg:
         duration: Optional[float] = None,
         normalize: bool = False,
         http_headers: Optional[dict] = None,
+        cookie_header: Optional[str] = None,
         extra_args: Sequence[str] = (),
     ) -> str:
         """Convert/extract audio from ``source`` into ``target``.
@@ -116,11 +138,16 @@ class FFmpeg:
         ``fmt`` is a container/codec like ``mp3``, ``m4a``, ``opus``, ``wav``.
         ``normalize`` applies EBU R128 loudness normalization. ``http_headers``
         are sent when ``source`` is a URL (YouTube's CDN rejects requests
-        without a browser User-Agent).
+        without a browser User-Agent). ``cookie_header`` is an optional raw
+        ``Cookie:`` value for URLs that require a session.
         """
         args: List[str] = ["-hide_banner", "-loglevel", "error", "-y"]
-        if http_headers and _is_url(source):
-            args += ["-headers", _headers_blob(http_headers)]
+        if _is_url(source):
+            headers = dict(http_headers or {})
+            if cookie_header:
+                headers["Cookie"] = cookie_header
+            if headers:
+                args += ["-headers", _headers_blob(headers)]
         if start is not None:
             args += ["-ss", str(start)]
         args += ["-i", source]

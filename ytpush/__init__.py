@@ -28,7 +28,7 @@ from .backend import YtDlpBackend
 from .client import YouTube, normalize_target
 from .errors import DownloadError, FFmpegError, FFmpegNotFound, YtpushError
 from .fetcher import Fetched, Fetcher
-from .ffmpeg import FFmpeg, find_ffmpeg, find_ffprobe
+from .ffmpeg import FFmpeg, find_ffmpeg, find_ffprobe, read_cookiefile
 from .models import Thumbnail, Track
 
 __version__ = "0.1.0"
@@ -44,6 +44,7 @@ __all__ = [
     "FFmpeg",
     "find_ffmpeg",
     "find_ffprobe",
+    "read_cookiefile",
     "YtpushError",
     "DownloadError",
     "FFmpegError",
