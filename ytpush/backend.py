@@ -8,9 +8,37 @@ methods (``extract`` and ``download``).
 from __future__ import annotations
 
 import os
+import shutil
 from typing import List, Optional, Sequence
 
 from .errors import DownloadError
+
+
+def _detect_ffmpeg_location() -> Optional[str]:
+    """Find ffmpeg so yt-dlp can post-process, without importing ffmpeg.py."""
+    path = os.environ.get("FFMPEG_BINARY") or shutil.which("ffmpeg")
+    if path and os.path.exists(path):
+        return path
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _default_js_runtimes() -> Optional[dict]:
+    """Detect an available JS runtime for yt-dlp's challenge solver.
+
+    YouTube's audio URLs are gated behind a JS challenge; yt-dlp solves it with
+    a runtime plus the ``yt-dlp-ejs`` package. Without one, only storyboard
+    images are exposed as formats.
+    """
+    for name, binary in (("node", "node"), ("deno", "deno"), ("bun", "bun")):
+        path = shutil.which(binary)
+        if path:
+            return {name: {"path": path}}
+    return None
 
 
 class YtDlpBackend:
@@ -24,12 +52,19 @@ class YtDlpBackend:
         cookiefile: Optional[str] = None,
         cookies_from_browser: Optional[str] = None,
         player_client: Optional[str] = None,
+        js_runtimes: Optional[dict] = None,
+        remote_components: Optional[Sequence[str]] = None,
     ) -> None:
-        self.ffmpeg_location = ffmpeg_location
+        self.ffmpeg_location = ffmpeg_location or _detect_ffmpeg_location()
         self.quiet = quiet
         self.cookiefile = cookiefile
         self.cookies_from_browser = cookies_from_browser
         self.player_client = player_client
+        # YouTube now gates audio formats behind a JavaScript challenge. yt-dlp
+        # needs a JS runtime (node/deno) plus the yt-dlp-ejs solver, or the only
+        # formats it sees are storyboard images.
+        self.js_runtimes = js_runtimes if js_runtimes is not None else _default_js_runtimes()
+        self.remote_components = remote_components
 
     def _base_opts(self) -> dict:
         opts = {
@@ -52,6 +87,10 @@ class YtDlpBackend:
             opts["cookiesfrombrowser"] = (self.cookies_from_browser,)
         if self.player_client:
             opts["extractor_args"] = {"youtube": {"player_client": [self.player_client]}}
+        if self.js_runtimes:
+            opts["js_runtimes"] = self.js_runtimes
+        if self.remote_components:
+            opts["remote_components"] = list(self.remote_components)
         return opts
 
     def extract(self, target: str) -> dict:

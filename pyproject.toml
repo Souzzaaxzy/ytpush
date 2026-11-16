@@ -12,6 +12,7 @@ license = { text = "MIT" }
 keywords = ["youtube", "yt-dlp", "ffmpeg", "audio", "bot", "download"]
 dependencies = [
     "yt-dlp>=2024.1.1",
+    "yt-dlp-ejs>=0.1.0",
 ]
 
 [project.optional-dependencies]

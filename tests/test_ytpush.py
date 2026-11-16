@@ -281,6 +281,32 @@ def test_backend_options_include_cookies_and_client():
     assert opts["ignoreerrors"] is True
 
 
+def test_backend_auto_detects_js_runtime(monkeypatch):
+    import ytpush.backend as mod
+
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/node" if name == "node" else None)
+    assert mod._default_js_runtimes() == {"node": {"path": "/usr/bin/node"}}
+    # and it lands in the options
+    backend = mod.YtDlpBackend()
+    assert backend._base_opts()["js_runtimes"] == {"node": {"path": "/usr/bin/node"}}
+
+
+def test_backend_js_runtime_none_when_missing(monkeypatch):
+    import ytpush.backend as mod
+
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    assert mod._default_js_runtimes() is None
+    backend = mod.YtDlpBackend()
+    assert "js_runtimes" not in backend._base_opts()
+
+
+def test_backend_explicit_js_runtimes_win():
+    from ytpush.backend import YtDlpBackend
+
+    backend = YtDlpBackend(js_runtimes={"deno": {}})
+    assert backend._base_opts()["js_runtimes"] == {"deno": {}}
+
+
 # -- ffmpeg --------------------------------------------------------------
 def test_find_ffmpeg_reports_when_missing(monkeypatch):
     import ytpush.ffmpeg as mod

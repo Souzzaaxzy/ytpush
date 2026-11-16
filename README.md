@@ -35,13 +35,32 @@ print(result.audio_path)   # downloads/Daft_Punk_-_....mp3
 print(result.cover_path)   # downloads/<id>.webp
 ```
 
+## Requisito importante: runtime JavaScript
+
+O YouTube agora esconde as URLs de áudio atrás de um **desafio JavaScript**.
+Sem resolvê-lo, o yt-dlp só enxerga imagens (storyboards) e o download falha.
+A lib resolve isso automaticamente, mas você precisa ter:
+
+1. **Um runtime JS instalado** — `node`, `deno` ou `bun` (a lib detecta sozinha);
+2. **O pacote `yt-dlp-ejs`** — já vem como dependência (`pip install -e .`).
+
+Se aparecer no log `Signature solving failed` ou `Only images are available`,
+é isso que falta. Verifique com:
+
+```bash
+python -c "from ytpush.backend import _default_js_runtimes; print(_default_js_runtimes())"
+# {'node': {'path': '/usr/bin/node'}}   <- ok
+# None                                   <- instale node/deno/bun
+```
+
 ## Instalação
 
 ```bash
-pip install -e ".[ffmpeg]"     # yt-dlp + ffmpeg estático (imageio-ffmpeg)
+pip install -e ".[ffmpeg]"     # yt-dlp + yt-dlp-ejs + ffmpeg estático
 ```
 
-Se já tem ffmpeg no sistema, `pip install -e .` basta.
+Se já tem ffmpeg no sistema, `pip install -e .` basta (o runtime JS ainda é
+necessário).
 
 O ffmpeg é procurado, nesta ordem:
 
@@ -96,33 +115,24 @@ print(ff.duration("saida.mp3"))
 
 ## Cookies e bloqueio "not a bot"
 
-De um IP de datacenter (VPS, CI, container) o YouTube pode responder
-*"Sign in to confirm you're not a bot"* ou devolver **403** no stream. Isso é
-detecção anti-bot do YouTube, não um bug da lib — de IP residencial costuma
-funcionar direto. Saídas:
+De um IP de datacenter (VPS, CI, container) o YouTube pode devolver **403** no
+stream. Isso é detecção anti-bot do YouTube, não um bug da lib. Cookies de uma
+conta logada resolvem:
 
 ```python
-# 1. usar cookies de um navegador logado
-yt = YouTube(cookies_from_browser="chrome")
-# 2. ou um arquivo de cookies exportado
-yt = YouTube(cookiefile="/caminho/cookies.txt")
-# 3. ou trocar o player client
-yt = YouTube(player_client="android")
+yt = YouTube(cookiefile="/caminho/cookies.txt")        # arquivo Netscape (yt-dlp)
+yt = YouTube(cookies_from_browser="chrome")             # direto do navegador
+yt = YouTube(player_client="android")                   # troca o player client
 ```
 
-A lib já manda os headers do YouTube (User-Agent etc.) quando o ffmpeg lê o
-stream direto — sem eles o CDN responde 403. Se o download não gravar arquivo,
-a lib levanta um erro explicando exatamente o bloqueio, em vez de mentir que
-deu certo.
+O arquivo de cookies pode ser exportado com a extensão "Get cookies.txt" ou com
+`yt-dlp --cookies-from-browser chrome --cookies cookies.txt`.
 
-Resumo do que é bloqueio do YouTube e o que é problema seu:
+> ⚠️ Cookie de conta = acesso à conta. Use uma conta descartável e proteja o
+> arquivo (`chmod 600`).
 
-| Sintoma | Causa |
-|---|---|
-| `Sign in to confirm you're not a bot` | IP de datacenter; use cookies |
-| `403 Forbidden` no stream | CDN recusou; headers/cookies |
-| `Video unavailable` | vídeo saiu do ar ou é regional |
-| Um resultado da busca falha | a busca ignora e segue (por design) |
+A lib manda os headers do YouTube **e** o cookie quando o ffmpeg lê o stream
+direto, e usa o mesmo cookie no downloader do yt-dlp.
 
 ## Aviso de uso
 
